@@ -1,6 +1,6 @@
 {
   "name": "desktop-manager",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Linux desktop management primitives — system checks, package install/removal, config application, hardware troubleshooting, and service/log inspection — plus a provisioning skill for a fresh desktop-management workspace. Local-only (not remote/server admin).",
   "author": {
     "name": "Daniel Rosehill",
@@ -8,5 +8,13 @@
   },
   "repository": "https://github.com/danielrosehill/desktop-manager-plugin",
   "license": "MIT",
-  "keywords": ["linux", "desktop", "sysadmin", "package-management", "hardware", "troubleshooting", "config"]
+  "keywords": [
+    "linux",
+    "desktop",
+    "sysadmin",
+    "package-management",
+    "hardware",
+    "troubleshooting",
+    "config"
+  ]
 }
