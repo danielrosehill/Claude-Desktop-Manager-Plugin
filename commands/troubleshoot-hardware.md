@@ -1,24 +1,52 @@
 ---
 name: troubleshoot-hardware
-description: Diagnose a misbehaving hardware device — audio, display, USB, Bluetooth, network, input. Runs targeted probes based on the device class and produces a triage report.
+description: Diagnose a misbehaving hardware device — audio, display, USB, Bluetooth, network, input. Picks probe variants based on the machine profile (Wayland vs X11, pipewire vs pulseaudio, recorded GPU). Reads $CLAUDE_USER_DATA/desktop-manager/profile.json.
 ---
 
 Troubleshoot a hardware device on the local desktop.
 
-Arguments: `$ARGUMENTS` — the device class or symptom, e.g. `audio`, `display`, `usb`, `bluetooth`, `network`, `keyboard`, `mouse`, or a free-form description.
+## Prelude — load profile
 
-1. **Classify the issue**. If ambiguous, ask the user one clarifying question.
+```bash
+PLUGIN_DATA_DIR="${CLAUDE_USER_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/claude-plugins}/desktop-manager"
+PROFILE_FILE="$PLUGIN_DATA_DIR/profile.json"
+
+if [ ! -f "$PROFILE_FILE" ]; then
+  echo "No machine profile found. Run /desktop-manager:onboard first."
+  exit 1
+fi
+```
+
+Read `desktop.session_type`, `desktop.audio_stack`, `hardware.gpu`, `quirks` from the profile. These shape which probes to run.
+
+## Arguments
+
+`$ARGUMENTS` — the device class or symptom: `audio`, `display`, `usb`, `bluetooth`, `network`, `keyboard`, `mouse`, or a free-form description.
+
+## Procedure
+
+1. **Classify the issue**. If ambiguous, ask the user one clarifying question. Cross-reference `quirks` — if any quirk matches the symptom, surface it before running probes.
 
 2. **Run the appropriate probe set**:
-   - **Audio**: `pactl info`, `pactl list short sinks`, `pactl list short sources`, `wpctl status` (if pipewire), relevant `journalctl -b` lines for `pulseaudio`/`pipewire`/`wireplumber`/`alsa`.
-   - **Display**: `xrandr` or `wlr-randr` (depending on session type), GPU driver via `lspci -k | grep -A2 VGA`, `journalctl -b | grep -iE 'drm|gpu|nvidia|amdgpu|i915'`.
-   - **USB**: `lsusb`, `dmesg | tail -n 50`, recent `journalctl -k` entries.
-   - **Bluetooth**: `bluetoothctl show`, `systemctl status bluetooth`, recent journal for `bluetoothd`.
-   - **Network**: `ip -br addr`, `ip route`, `nmcli device status`, `systemctl status NetworkManager`, `journalctl -u NetworkManager -b --no-pager | tail -n 50`.
-   - **Input**: `libinput list-devices` (may require sudo), `udevadm info` for the device, journal for kernel input events.
 
-3. **Summarise findings**: what is the device, is the kernel seeing it, is the daemon managing it, any error signatures in the log?
+   - **Audio**: pick variant by `desktop.audio_stack`:
+     - `pipewire` → `wpctl status`, `pactl info` (pipewire-pulse shim), `journalctl --user -u pipewire -u wireplumber -b --no-pager | tail -n 100`.
+     - `pulseaudio` → `pactl info`, `pactl list short sinks`, `pactl list short sources`, journal for `pulseaudio`.
+     - `alsa` → `aplay -l`, `arecord -l`, `dmesg | grep -i snd`.
+   - **Display**: pick variant by `desktop.session_type`:
+     - `x11` → `xrandr`, `glxinfo | head -n 20` if available.
+     - `wayland` → `wlr-randr` if available, else `kscreen-doctor -o` (KDE) / `gnome-randr` (GNOME).
+     - GPU driver: cross-reference `hardware.gpu[].driver_in_use` against current `lspci -k | grep -A2 VGA` — flag drift.
+     - Journal: `journalctl -b | grep -iE 'drm|gpu|nvidia|amdgpu|i915'`.
+   - **USB**: `lsusb`, `dmesg --since "1 hour ago" | tail -n 100`, recent `journalctl -k`.
+   - **Bluetooth**: `bluetoothctl show`, `systemctl status bluetooth`, journal for `bluetoothd`.
+   - **Network**: `ip -br addr`, `ip route`, `nmcli device status`, `systemctl status NetworkManager`, journal for `NetworkManager`.
+   - **Input**: `libinput list-devices` (sudo), `udevadm info` for the device, journal for kernel input events.
 
-4. **Propose next steps**: likely fixes ranked by invasiveness (restart daemon → reinstall driver → kernel module reload → reboot). Require confirmation before any destructive action.
+3. **Summarise findings**: device, kernel-visible?, daemon-managed?, error signatures in the log, any quirk matches.
 
-5. **Write report** to `outputs/hw-triage-<class>-YYYY-MM-DD-HHMM.md`.
+4. **Propose next steps** ranked by invasiveness (restart daemon → reinstall driver → kernel module reload → reboot). Require confirmation before destructive action.
+
+5. **Write report** to `outputs/hw-triage-<class>-YYYY-MM-DD-HHMM.md` (workspace) or `$PLUGIN_DATA_DIR/reports/hw-triage-<class>-YYYY-MM-DD-HHMM.md`.
+
+6. If a recurring quirk is uncovered (something the user will keep tripping on), suggest `/desktop-manager:update-profile quirks +"<short description>"` so it gets recorded.

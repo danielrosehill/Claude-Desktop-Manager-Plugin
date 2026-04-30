@@ -1,7 +1,7 @@
 {
   "name": "desktop-manager",
-  "version": "1.0.1",
-  "description": "Linux desktop management primitives — system checks, package install/removal, config application, hardware troubleshooting, and service/log inspection — plus a provisioning skill for a fresh desktop-management workspace. Local-only (not remote/server admin).",
+  "version": "2.0.0",
+  "description": "Linux desktop management workflow — auto-profiles the local machine on first run and persists it to user data, then runs system checks, package install/remove, config application, hardware troubleshooting, and service/log inspection against that profile. Local-only (not remote/server admin).",
   "author": {
     "name": "Daniel Rosehill",
     "url": "https://github.com/danielrosehill"
@@ -15,6 +15,7 @@
     "package-management",
     "hardware",
     "troubleshooting",
-    "config"
+    "config",
+    "user-profile"
   ]
 }
